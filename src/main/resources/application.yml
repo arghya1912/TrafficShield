@@ -23,6 +23,9 @@ trafficshield:
       rateLimit:
         capacity: 5
         refillRatePerSecond: 1
+      circuitBreaker:
+        failureThreshold: 3
+        openDurationSeconds: 30
       instances:
         - instanceId: user-service-1
           baseUrl: http://localhost:8080/mock/user-service-1
@@ -35,6 +38,9 @@ trafficshield:
       rateLimit:
         capacity: 3
         refillRatePerSecond: 1
+      circuitBreaker:
+        failureThreshold: 3
+        openDurationSeconds: 30
       instances:
         - instanceId: payment-service-1
           baseUrl: http://localhost:8080/mock/payment-service-1

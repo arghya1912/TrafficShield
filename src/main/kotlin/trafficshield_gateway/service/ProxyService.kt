@@ -16,7 +16,8 @@ class ProxyService(
     private val loadBalancer: LoadBalancer,
     private val restTemplate: RestTemplate,
     private val requestMetricRepository: RequestMetricRepository,
-    private val rateLimiterService: RateLimiterService
+    private val rateLimiterService: RateLimiterService,
+    private val circuitBreakerService: CircuitBreakerService
 ) {
 
     fun forwardGetRequest(clientId: String, serviceName: String, path: String): ProxyResponse {
@@ -55,8 +56,43 @@ class ProxyService(
             )
         }
 
+        val circuitBreakerConfig = serviceRegistry.getCircuitBreakerConfig(serviceName)
         val instances = serviceRegistry.getInstances(serviceName)
-        val selectedInstance = loadBalancer.choose(serviceName, instances)
+
+        val availableInstances = instances.filter { instance ->
+            circuitBreakerService.isRequestAllowed(
+                serviceName = serviceName,
+                instanceId = instance.instanceId,
+                config = circuitBreakerConfig
+            )
+        }
+
+        if (availableInstances.isEmpty()) {
+            val latencyMs = System.currentTimeMillis() - startTime
+
+            requestMetricRepository.save(
+                RequestMetric(
+                    requestId = requestId,
+                    serviceName = serviceName,
+                    selectedInstance = "N/A",
+                    targetUrl = "N/A",
+                    statusCode = 503,
+                    success = false,
+                    latencyMs = latencyMs,
+                    errorMessage = "All instances unavailable due to open circuit breakers"
+                )
+            )
+
+            return ProxyResponse(
+                serviceName = serviceName,
+                selectedInstance = "N/A",
+                targetUrl = "N/A",
+                statusCode = 503,
+                responseBody = "All instances unavailable due to open circuit breakers"
+            )
+        }
+
+        val selectedInstance = loadBalancer.choose(serviceName, availableInstances)
 
         val normalizedPath = path.trimStart('/')
         val targetUrl = "${selectedInstance.baseUrl}/$normalizedPath"
@@ -71,6 +107,20 @@ class ProxyService(
 
             val latencyMs = System.currentTimeMillis() - startTime
             val statusCode = response.statusCode.value()
+
+            if (statusCode in 200..299) {
+                circuitBreakerService.recordSuccess(
+                    serviceName = serviceName,
+                    instanceId = selectedInstance.instanceId
+                )
+            } else {
+                circuitBreakerService.recordFailure(
+                    serviceName = serviceName,
+                    instanceId = selectedInstance.instanceId,
+                    config = circuitBreakerConfig,
+                    reason = "HTTP $statusCode"
+                )
+            }
 
             requestMetricRepository.save(
                 RequestMetric(
@@ -96,6 +146,13 @@ class ProxyService(
             val latencyMs = System.currentTimeMillis() - startTime
             val statusCode = ex.statusCode.value()
 
+            circuitBreakerService.recordFailure(
+                serviceName = serviceName,
+                instanceId = selectedInstance.instanceId,
+                config = circuitBreakerConfig,
+                reason = "HTTP ${ex.statusCode.value()}"
+            )
+
             requestMetricRepository.save(
                 RequestMetric(
                     requestId = requestId,
@@ -118,6 +175,13 @@ class ProxyService(
             )
         } catch (ex: Exception) {
             val latencyMs = System.currentTimeMillis() - startTime
+
+            circuitBreakerService.recordFailure(
+                serviceName = serviceName,
+                instanceId = selectedInstance.instanceId,
+                config = circuitBreakerConfig,
+                reason = ex.message
+            )
 
             requestMetricRepository.save(
                 RequestMetric(

@@ -1,6 +1,7 @@
 package trafficshield_gateway.service
 
 import org.springframework.stereotype.Service
+import trafficshield_gateway.config.CircuitBreakerConfig
 import trafficshield_gateway.config.RateLimitConfig
 import trafficshield_gateway.config.TrafficShieldProperties
 import trafficshield_gateway.model.ServiceInstance
@@ -22,5 +23,10 @@ class ServiceRegistry(
     fun getRateLimitConfig(serviceName: String): RateLimitConfig {
         return properties.services[serviceName]?.rateLimit
             ?: throw IllegalArgumentException("No rate limit config found for service: $serviceName")
+    }
+
+    fun getCircuitBreakerConfig(serviceName: String): CircuitBreakerConfig {
+        return properties.services[serviceName]?.circuitBreaker
+            ?: throw IllegalArgumentException("No circuit breaker config found for service: $serviceName")
     }
 }
