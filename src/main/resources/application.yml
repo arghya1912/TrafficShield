@@ -1,0 +1,33 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/trafficshield
+    username: trafficshield
+    password: trafficshield
+    driver-class-name: org.postgresql.Driver
+
+  sql:
+    init:
+      mode: always
+
+trafficshield:
+  services:
+    user-service:
+      instances:
+        - instanceId: user-service-1
+          baseUrl: http://localhost:8080/mock/user-service-1
+          weight: 1
+        - instanceId: user-service-2
+          baseUrl: http://localhost:8080/mock/user-service-2
+          weight: 1
+
+    payment-service:
+      instances:
+        - instanceId: payment-service-1
+          baseUrl: http://localhost:8080/mock/payment-service-1
+          weight: 1
+        - instanceId: payment-service-2
+          baseUrl: http://localhost:8080/mock/payment-service-2
+          weight: 1
