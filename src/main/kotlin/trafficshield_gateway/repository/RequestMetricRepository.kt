@@ -3,6 +3,8 @@ package trafficshield_gateway.repository
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import trafficshield_gateway.model.RequestMetric
+import trafficshield_gateway.model.OverallMetricsResponse
+import trafficshield_gateway.model.ServiceMetricsResponse
 import java.sql.Timestamp
 
 @Repository
@@ -50,5 +52,123 @@ class RequestMetricRepository(
         """.trimIndent()
 
         return jdbcTemplate.queryForList(sql, limit)
+    }
+
+    fun getOverallMetrics(): OverallMetricsResponse {
+        val sql = """
+        SELECT
+            COUNT(*) AS total_requests,
+            COALESCE(SUM(CASE WHEN success = true THEN 1 ELSE 0 END), 0) AS successful_requests,
+            COALESCE(SUM(CASE WHEN success = false THEN 1 ELSE 0 END), 0) AS failed_requests,
+            COALESCE(AVG(latency_ms), 0) AS average_latency_ms,
+            COALESCE(MAX(latency_ms), 0) AS max_latency_ms
+        FROM request_metrics
+    """.trimIndent()
+
+        val row = jdbcTemplate.queryForMap(sql)
+
+        val totalRequests = (row["total_requests"] as Number).toLong()
+        val successfulRequests = (row["successful_requests"] as Number).toLong()
+        val failedRequests = (row["failed_requests"] as Number).toLong()
+        val averageLatencyMs = (row["average_latency_ms"] as Number).toDouble()
+        val maxLatencyMs = (row["max_latency_ms"] as Number).toLong()
+
+        val successRate = if (totalRequests == 0L) {
+            0.0
+        } else {
+            (successfulRequests.toDouble() / totalRequests.toDouble()) * 100
+        }
+
+        return OverallMetricsResponse(
+            totalRequests = totalRequests,
+            successfulRequests = successfulRequests,
+            failedRequests = failedRequests,
+            successRate = successRate,
+            averageLatencyMs = averageLatencyMs,
+            maxLatencyMs = maxLatencyMs
+        )
+    }
+
+    fun getMetricsByService(): List<ServiceMetricsResponse> {
+        val sql = """
+        SELECT
+            service_name,
+            COUNT(*) AS total_requests,
+            COALESCE(SUM(CASE WHEN success = true THEN 1 ELSE 0 END), 0) AS successful_requests,
+            COALESCE(SUM(CASE WHEN success = false THEN 1 ELSE 0 END), 0) AS failed_requests,
+            COALESCE(AVG(latency_ms), 0) AS average_latency_ms,
+            COALESCE(MAX(latency_ms), 0) AS max_latency_ms
+        FROM request_metrics
+        GROUP BY service_name
+        ORDER BY total_requests DESC
+    """.trimIndent()
+
+        return jdbcTemplate.query(sql) { rs, _ ->
+            val totalRequests = rs.getLong("total_requests")
+            val successfulRequests = rs.getLong("successful_requests")
+            val failedRequests = rs.getLong("failed_requests")
+
+            val successRate = if (totalRequests == 0L) {
+                0.0
+            } else {
+                (successfulRequests.toDouble() / totalRequests.toDouble()) * 100
+            }
+
+            ServiceMetricsResponse(
+                serviceName = rs.getString("service_name"),
+                totalRequests = totalRequests,
+                successfulRequests = successfulRequests,
+                failedRequests = failedRequests,
+                successRate = successRate,
+                averageLatencyMs = rs.getDouble("average_latency_ms"),
+                maxLatencyMs = rs.getLong("max_latency_ms")
+            )
+        }
+    }
+
+    fun getMetricsForService(serviceName: String): ServiceMetricsResponse {
+        val sql = """
+        SELECT
+            service_name,
+            COUNT(*) AS total_requests,
+            COALESCE(SUM(CASE WHEN success = true THEN 1 ELSE 0 END), 0) AS successful_requests,
+            COALESCE(SUM(CASE WHEN success = false THEN 1 ELSE 0 END), 0) AS failed_requests,
+            COALESCE(AVG(latency_ms), 0) AS average_latency_ms,
+            COALESCE(MAX(latency_ms), 0) AS max_latency_ms
+        FROM request_metrics
+        WHERE service_name = ?
+        GROUP BY service_name
+    """.trimIndent()
+
+        return jdbcTemplate.query(sql, { rs, _ ->
+            val totalRequests = rs.getLong("total_requests")
+            val successfulRequests = rs.getLong("successful_requests")
+            val failedRequests = rs.getLong("failed_requests")
+
+            val successRate = if (totalRequests == 0L) {
+                0.0
+            } else {
+                (successfulRequests.toDouble() / totalRequests.toDouble()) * 100
+            }
+
+            ServiceMetricsResponse(
+                serviceName = rs.getString("service_name"),
+                totalRequests = totalRequests,
+                successfulRequests = successfulRequests,
+                failedRequests = failedRequests,
+                successRate = successRate,
+                averageLatencyMs = rs.getDouble("average_latency_ms"),
+                maxLatencyMs = rs.getLong("max_latency_ms")
+            )
+        }, serviceName).firstOrNull()
+            ?: ServiceMetricsResponse(
+                serviceName = serviceName,
+                totalRequests = 0,
+                successfulRequests = 0,
+                failedRequests = 0,
+                successRate = 0.0,
+                averageLatencyMs = 0.0,
+                maxLatencyMs = 0
+            )
     }
 }
