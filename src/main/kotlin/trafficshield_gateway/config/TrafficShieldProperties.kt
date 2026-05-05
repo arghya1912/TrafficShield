@@ -12,10 +12,16 @@ class TrafficShieldProperties {
 
 class ServiceConfig {
     var rateLimit: RateLimitConfig = RateLimitConfig()
+    var circuitBreaker: CircuitBreakerConfig = CircuitBreakerConfig()
     var instances: MutableList<ServiceInstance> = mutableListOf()
 }
 
 class RateLimitConfig {
     var capacity: Long = 5
     var refillRatePerSecond: Long = 1
+}
+
+class CircuitBreakerConfig {
+    var failureThreshold: Int = 3
+    var openDurationSeconds: Long = 30
 }
