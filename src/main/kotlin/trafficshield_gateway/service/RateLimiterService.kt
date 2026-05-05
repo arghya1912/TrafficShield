@@ -4,6 +4,7 @@ import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.script.DefaultRedisScript
 import org.springframework.stereotype.Service
 import trafficshield_gateway.config.RateLimitConfig
+import trafficshield_gateway.model.RateLimitStateResponse
 
 @Service
 class RateLimiterService(
@@ -76,5 +77,49 @@ class RateLimiterService(
         )
 
         return result == 1L
+    }
+
+    fun getRateLimitState(
+        clientId: String,
+        serviceName: String
+    ): RateLimitStateResponse {
+        val safeClientId = clientId.ifBlank { "anonymous" }
+
+        val tokensKey = "rate_limit:$safeClientId:$serviceName:tokens"
+        val timestampKey = "rate_limit:$safeClientId:$serviceName:timestamp"
+
+        val currentTokens = redisTemplate.opsForValue().get(tokensKey)
+        val lastRefillTimestamp = redisTemplate.opsForValue().get(timestampKey)
+
+        return RateLimitStateResponse(
+            clientId = safeClientId,
+            serviceName = serviceName,
+            tokensKey = tokensKey,
+            timestampKey = timestampKey,
+            currentTokens = currentTokens,
+            lastRefillTimestamp = lastRefillTimestamp
+        )
+    }
+
+    fun resetRateLimit(
+        clientId: String,
+        serviceName: String
+    ): RateLimitStateResponse {
+        val safeClientId = clientId.ifBlank { "anonymous" }
+
+        val tokensKey = "rate_limit:$safeClientId:$serviceName:tokens"
+        val timestampKey = "rate_limit:$safeClientId:$serviceName:timestamp"
+
+        redisTemplate.delete(tokensKey)
+        redisTemplate.delete(timestampKey)
+
+        return RateLimitStateResponse(
+            clientId = safeClientId,
+            serviceName = serviceName,
+            tokensKey = tokensKey,
+            timestampKey = timestampKey,
+            currentTokens = null,
+            lastRefillTimestamp = null
+        )
     }
 }
