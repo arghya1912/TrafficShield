@@ -15,12 +15,45 @@ class ProxyService(
     private val serviceRegistry: ServiceRegistry,
     private val loadBalancer: LoadBalancer,
     private val restTemplate: RestTemplate,
-    private val requestMetricRepository: RequestMetricRepository
+    private val requestMetricRepository: RequestMetricRepository,
+    private val rateLimiterService: RateLimiterService
 ) {
 
-    fun forwardGetRequest(serviceName: String, path: String): ProxyResponse {
+    fun forwardGetRequest(clientId: String, serviceName: String, path: String): ProxyResponse {
         val requestId = UUID.randomUUID().toString()
         val startTime = System.currentTimeMillis()
+
+        val rateLimitConfig = serviceRegistry.getRateLimitConfig(serviceName)
+        val allowed = rateLimiterService.isAllowed(
+            clientId = clientId,
+            serviceName = serviceName,
+            rateLimitConfig = rateLimitConfig
+        )
+
+        if (!allowed) {
+            val latencyMs = System.currentTimeMillis() - startTime
+
+            requestMetricRepository.save(
+                RequestMetric(
+                    requestId = requestId,
+                    serviceName = serviceName,
+                    selectedInstance = "N/A",
+                    targetUrl = "N/A",
+                    statusCode = 429,
+                    success = false,
+                    latencyMs = latencyMs,
+                    errorMessage = "Rate limit exceeded for clientId=$clientId"
+                )
+            )
+
+            return ProxyResponse(
+                serviceName = serviceName,
+                selectedInstance = "N/A",
+                targetUrl = "N/A",
+                statusCode = 429,
+                responseBody = "Rate limit exceeded for clientId=$clientId"
+            )
+        }
 
         val instances = serviceRegistry.getInstances(serviceName)
         val selectedInstance = loadBalancer.choose(serviceName, instances)
