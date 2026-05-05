@@ -12,9 +12,17 @@ spring:
     init:
       mode: always
 
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
 trafficshield:
   services:
     user-service:
+      rateLimit:
+        capacity: 5
+        refillRatePerSecond: 1
       instances:
         - instanceId: user-service-1
           baseUrl: http://localhost:8080/mock/user-service-1
@@ -24,6 +32,9 @@ trafficshield:
           weight: 1
 
     payment-service:
+      rateLimit:
+        capacity: 3
+        refillRatePerSecond: 1
       instances:
         - instanceId: payment-service-1
           baseUrl: http://localhost:8080/mock/payment-service-1

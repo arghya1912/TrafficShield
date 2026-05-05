@@ -11,5 +11,11 @@ class TrafficShieldProperties {
 }
 
 class ServiceConfig {
+    var rateLimit: RateLimitConfig = RateLimitConfig()
     var instances: MutableList<ServiceInstance> = mutableListOf()
+}
+
+class RateLimitConfig {
+    var capacity: Long = 5
+    var refillRatePerSecond: Long = 1
 }
