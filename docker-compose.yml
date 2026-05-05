@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: trafficshield-postgres
+    environment:
+      POSTGRES_DB: trafficshield
+      POSTGRES_USER: trafficshield
+      POSTGRES_PASSWORD: trafficshield
+    ports:
+      - "5432:5432"
+    volumes:
+      - trafficshield_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  trafficshield_postgres_data:
