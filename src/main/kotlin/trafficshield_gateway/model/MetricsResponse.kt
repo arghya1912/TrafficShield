@@ -18,3 +18,8 @@ data class ServiceMetricsResponse(
     val averageLatencyMs: Double,
     val maxLatencyMs: Long
 )
+
+data class OutcomeMetricsResponse(
+    val outcomeType: String,
+    val totalRequests: Long
+)

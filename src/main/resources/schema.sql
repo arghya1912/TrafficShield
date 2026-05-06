@@ -19,3 +19,9 @@ ON request_metrics(created_at);
 
 CREATE INDEX IF NOT EXISTS idx_request_metrics_success
 ON request_metrics(success);
+
+ALTER TABLE request_metrics
+ADD COLUMN IF NOT EXISTS outcome_type VARCHAR(50) NOT NULL DEFAULT 'UNKNOWN';
+
+CREATE INDEX IF NOT EXISTS idx_request_metrics_outcome_type
+ON request_metrics(outcome_type);

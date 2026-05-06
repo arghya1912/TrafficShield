@@ -2,6 +2,7 @@ package trafficshield_gateway.repository
 
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import trafficshield_gateway.model.OutcomeMetricsResponse
 import trafficshield_gateway.model.RequestMetric
 import trafficshield_gateway.model.OverallMetricsResponse
 import trafficshield_gateway.model.ServiceMetricsResponse
@@ -14,19 +15,20 @@ class RequestMetricRepository(
 
     fun save(metric: RequestMetric) {
         val sql = """
-            INSERT INTO request_metrics (
-                request_id,
-                service_name,
-                selected_instance,
-                target_url,
-                status_code,
-                success,
-                latency_ms,
-                error_message,
-                created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """.trimIndent()
+        INSERT INTO request_metrics (
+            request_id,
+            service_name,
+            selected_instance,
+            target_url,
+            status_code,
+            success,
+            outcome_type,
+            latency_ms,
+            error_message,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """.trimIndent()
 
         jdbcTemplate.update(
             sql,
@@ -36,6 +38,7 @@ class RequestMetricRepository(
             metric.targetUrl,
             metric.statusCode,
             metric.success,
+            metric.outcomeType.name,
             metric.latencyMs,
             metric.errorMessage,
             Timestamp.from(metric.createdAt)
@@ -44,14 +47,30 @@ class RequestMetricRepository(
 
     fun findRecent(limit: Int = 20): List<Map<String, Any>> {
         val sql = """
-            SELECT request_id, service_name, selected_instance, target_url,
-                   status_code, success, latency_ms, error_message, created_at
-            FROM request_metrics
-            ORDER BY created_at DESC
-            LIMIT ?
-        """.trimIndent()
+        SELECT request_id, service_name, selected_instance, target_url,
+               status_code, success, outcome_type, latency_ms, error_message, created_at
+        FROM request_metrics
+        ORDER BY created_at DESC
+        LIMIT ?
+    """.trimIndent()
 
         return jdbcTemplate.queryForList(sql, limit)
+    }
+
+    fun getMetricsByOutcome(): List<OutcomeMetricsResponse> {
+        val sql = """
+        SELECT outcome_type, COUNT(*) AS total_requests
+        FROM request_metrics
+        GROUP BY outcome_type
+        ORDER BY total_requests DESC
+    """.trimIndent()
+
+        return jdbcTemplate.query(sql) { rs, _ ->
+            OutcomeMetricsResponse(
+                outcomeType = rs.getString("outcome_type"),
+                totalRequests = rs.getLong("total_requests")
+            )
+        }
     }
 
     fun getOverallMetrics(): OverallMetricsResponse {

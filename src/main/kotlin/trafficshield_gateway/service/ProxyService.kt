@@ -7,6 +7,7 @@ import org.springframework.web.client.RestTemplate
 import trafficshield_gateway.loadbalancer.LoadBalancer
 import trafficshield_gateway.model.ProxyResponse
 import trafficshield_gateway.model.RequestMetric
+import trafficshield_gateway.model.RequestOutcome
 import trafficshield_gateway.repository.RequestMetricRepository
 import java.util.UUID
 
@@ -42,6 +43,7 @@ class ProxyService(
                     targetUrl = "N/A",
                     statusCode = 429,
                     success = false,
+                    outcomeType = RequestOutcome.RATE_LIMITED,
                     latencyMs = latencyMs,
                     errorMessage = "Rate limit exceeded for clientId=$clientId"
                 )
@@ -78,6 +80,7 @@ class ProxyService(
                     targetUrl = "N/A",
                     statusCode = 503,
                     success = false,
+                    outcomeType = RequestOutcome.CIRCUIT_OPEN,
                     latencyMs = latencyMs,
                     errorMessage = "All instances unavailable due to open circuit breakers"
                 )
@@ -108,6 +111,12 @@ class ProxyService(
             val latencyMs = System.currentTimeMillis() - startTime
             val statusCode = response.statusCode.value()
 
+            val outcomeType = if (statusCode in 200..299) {
+                RequestOutcome.SUCCESS
+            } else {
+                RequestOutcome.DOWNSTREAM_FAILURE
+            }
+
             if (statusCode in 200..299) {
                 circuitBreakerService.recordSuccess(
                     serviceName = serviceName,
@@ -130,6 +139,7 @@ class ProxyService(
                     targetUrl = targetUrl,
                     statusCode = statusCode,
                     success = statusCode in 200..299,
+                    outcomeType = outcomeType,
                     latencyMs = latencyMs,
                     errorMessage = null
                 )
@@ -161,6 +171,7 @@ class ProxyService(
                     targetUrl = targetUrl,
                     statusCode = statusCode,
                     success = false,
+                    outcomeType = RequestOutcome.DOWNSTREAM_FAILURE,
                     latencyMs = latencyMs,
                     errorMessage = ex.responseBodyAsString
                 )
@@ -191,6 +202,7 @@ class ProxyService(
                     targetUrl = targetUrl,
                     statusCode = 502,
                     success = false,
+                    outcomeType = RequestOutcome.BAD_GATEWAY,
                     latencyMs = latencyMs,
                     errorMessage = ex.message
                 )
