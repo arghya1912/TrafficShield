@@ -1,5 +1,6 @@
 package trafficshield_gateway.service
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.http.HttpMethod
 import org.springframework.stereotype.Service
 import org.springframework.web.client.HttpStatusCodeException
@@ -18,7 +19,8 @@ class ProxyService(
     private val restTemplate: RestTemplate,
     private val requestMetricRepository: RequestMetricRepository,
     private val rateLimiterService: RateLimiterService,
-    private val circuitBreakerService: CircuitBreakerService
+    private val circuitBreakerService: CircuitBreakerService,
+    private val objectMapper: ObjectMapper
 ) {
 
     fun forwardGetRequest(clientId: String, serviceName: String, path: String): ProxyResponse {
@@ -50,11 +52,18 @@ class ProxyService(
             )
 
             return ProxyResponse(
+                requestId = requestId,
                 serviceName = serviceName,
                 selectedInstance = "N/A",
                 targetUrl = "N/A",
                 statusCode = 429,
-                responseBody = "Rate limit exceeded for clientId=$clientId"
+                outcome = RequestOutcome.RATE_LIMITED,
+                latencyMs = latencyMs,
+                responseBody = mapOf(
+                    "message" to "Rate limit exceeded",
+                    "clientId" to clientId,
+                    "serviceName" to serviceName
+                )
             )
         }
 
@@ -87,11 +96,17 @@ class ProxyService(
             )
 
             return ProxyResponse(
+                requestId = requestId,
                 serviceName = serviceName,
                 selectedInstance = "N/A",
                 targetUrl = "N/A",
                 statusCode = 503,
-                responseBody = "All instances unavailable due to open circuit breakers"
+                outcome = RequestOutcome.CIRCUIT_OPEN,
+                latencyMs = latencyMs,
+                responseBody = mapOf(
+                    "message" to "All instances unavailable due to open circuit breakers",
+                    "serviceName" to serviceName
+                )
             )
         }
 
@@ -146,11 +161,14 @@ class ProxyService(
             )
 
             ProxyResponse(
+                requestId = requestId,
                 serviceName = serviceName,
                 selectedInstance = selectedInstance.instanceId,
                 targetUrl = targetUrl,
                 statusCode = statusCode,
-                responseBody = response.body ?: ""
+                outcome = outcomeType,
+                latencyMs = latencyMs,
+                responseBody = parseResponseBody(response.body)
             )
         } catch (ex: HttpStatusCodeException) {
             val latencyMs = System.currentTimeMillis() - startTime
@@ -178,11 +196,14 @@ class ProxyService(
             )
 
             ProxyResponse(
+                requestId = requestId,
                 serviceName = serviceName,
                 selectedInstance = selectedInstance.instanceId,
                 targetUrl = targetUrl,
                 statusCode = statusCode,
-                responseBody = ex.responseBodyAsString
+                outcome = RequestOutcome.DOWNSTREAM_FAILURE,
+                latencyMs = latencyMs,
+                responseBody = parseResponseBody(ex.responseBodyAsString)
             )
         } catch (ex: Exception) {
             val latencyMs = System.currentTimeMillis() - startTime
@@ -209,12 +230,29 @@ class ProxyService(
             )
 
             ProxyResponse(
+                requestId = requestId,
                 serviceName = serviceName,
                 selectedInstance = selectedInstance.instanceId,
                 targetUrl = targetUrl,
                 statusCode = 502,
-                responseBody = ex.message ?: "Bad Gateway"
+                outcome = RequestOutcome.BAD_GATEWAY,
+                latencyMs = latencyMs,
+                responseBody = mapOf(
+                    "message" to (ex.message ?: "Bad Gateway")
+                )
             )
+        }
+    }
+
+    private fun parseResponseBody(responseBody: String?): Any? {
+        if (responseBody.isNullOrBlank()) {
+            return null
+        }
+
+        return try {
+            objectMapper.readValue(responseBody, Map::class.java)
+        } catch (ex: Exception) {
+            responseBody
         }
     }
 }
