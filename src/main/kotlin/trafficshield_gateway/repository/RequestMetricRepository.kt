@@ -190,4 +190,33 @@ class RequestMetricRepository(
                 maxLatencyMs = 0
             )
     }
+    fun getTopProblematicService(): String? {
+        val sql = """
+        SELECT service_name
+        FROM request_metrics
+        WHERE success = false
+        GROUP BY service_name
+        ORDER BY COUNT(*) DESC
+        LIMIT 1
+    """.trimIndent()
+
+        return jdbcTemplate.query(sql) { rs, _ ->
+            rs.getString("service_name")
+        }.firstOrNull()
+    }
+
+    fun getDominantFailureType(): String? {
+        val sql = """
+        SELECT outcome_type
+        FROM request_metrics
+        WHERE success = false
+        GROUP BY outcome_type
+        ORDER BY COUNT(*) DESC
+        LIMIT 1
+    """.trimIndent()
+
+        return jdbcTemplate.query(sql) { rs, _ ->
+            rs.getString("outcome_type")
+        }.firstOrNull()
+    }
 }
