@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import trafficshield_gateway.model.OutcomeMetricsResponse
 import trafficshield_gateway.model.OverallMetricsResponse
 import trafficshield_gateway.model.ServiceMetricsResponse
 
@@ -37,5 +38,10 @@ class MetricsController(
         @PathVariable serviceName: String
     ): ServiceMetricsResponse {
         return requestMetricRepository.getMetricsForService(serviceName)
+    }
+
+    @GetMapping("/outcomes")
+    fun getMetricsByOutcome(): List<OutcomeMetricsResponse> {
+        return requestMetricRepository.getMetricsByOutcome()
     }
 }
