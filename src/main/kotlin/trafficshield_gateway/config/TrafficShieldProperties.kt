@@ -2,6 +2,7 @@ package trafficshield_gateway.config
 
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.stereotype.Component
+import trafficshield_gateway.model.LoadBalancingStrategy
 import trafficshield_gateway.model.ServiceInstance
 
 @Component
@@ -11,6 +12,7 @@ class TrafficShieldProperties {
 }
 
 class ServiceConfig {
+    var loadBalancingStrategy: LoadBalancingStrategy = LoadBalancingStrategy.ROUND_ROBIN
     var rateLimit: RateLimitConfig = RateLimitConfig()
     var circuitBreaker: CircuitBreakerConfig = CircuitBreakerConfig()
     var instances: MutableList<ServiceInstance> = mutableListOf()

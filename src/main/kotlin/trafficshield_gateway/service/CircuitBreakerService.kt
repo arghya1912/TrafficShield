@@ -110,6 +110,10 @@ class CircuitBreakerService {
         states[key] = CircuitBreakerInternalState()
     }
 
+    fun resetAll() {
+        states.clear()
+    }
+
     private fun openCircuit(state: CircuitBreakerInternalState) {
         state.state = CircuitBreakerState.OPEN
         state.openedAt = Instant.now()
