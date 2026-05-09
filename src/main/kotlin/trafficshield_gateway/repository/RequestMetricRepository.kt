@@ -145,6 +145,10 @@ class RequestMetricRepository(
         }
     }
 
+    fun deleteAll() {
+        jdbcTemplate.update("DELETE FROM request_metrics")
+    }
+
     fun getMetricsForService(serviceName: String): ServiceMetricsResponse {
         val sql = """
         SELECT

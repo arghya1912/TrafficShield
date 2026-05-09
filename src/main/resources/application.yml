@@ -1,11 +1,11 @@
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/trafficshield
-    username: trafficshield
-    password: trafficshield
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/trafficshield}
+    username: ${SPRING_DATASOURCE_USERNAME:trafficshield}
+    password: ${SPRING_DATASOURCE_PASSWORD:trafficshield}
     driver-class-name: org.postgresql.Driver
 
   sql:
@@ -14,12 +14,14 @@ spring:
 
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 trafficshield:
+  appBaseUrl: ${APP_BASE_URL:http://localhost:8080}
   services:
     user-service:
+      loadBalancingStrategy: ROUND_ROBIN
       rateLimit:
         capacity: 5
         refillRatePerSecond: 1
@@ -28,23 +30,24 @@ trafficshield:
         openDurationSeconds: 30
       instances:
         - instanceId: user-service-1
-          baseUrl: http://localhost:8080/mock/user-service-1
+          baseUrl: ${trafficshield.appBaseUrl}/mock/user-service-1
           weight: 1
         - instanceId: user-service-2
-          baseUrl: http://localhost:8080/mock/user-service-2
+          baseUrl: ${trafficshield.appBaseUrl}/mock/user-service-2
           weight: 1
 
     payment-service:
+      loadBalancingStrategy: WEIGHTED_ROUND_ROBIN
       rateLimit:
-        capacity: 3
-        refillRatePerSecond: 1
+        capacity: 10
+        refillRatePerSecond: 2
       circuitBreaker:
         failureThreshold: 3
         openDurationSeconds: 30
       instances:
         - instanceId: payment-service-1
-          baseUrl: http://localhost:8080/mock/payment-service-1
-          weight: 1
+          baseUrl: ${trafficshield.appBaseUrl}/mock/payment-service-1
+          weight: 3
         - instanceId: payment-service-2
-          baseUrl: http://localhost:8080/mock/payment-service-2
+          baseUrl: ${trafficshield.appBaseUrl}/mock/payment-service-2
           weight: 1

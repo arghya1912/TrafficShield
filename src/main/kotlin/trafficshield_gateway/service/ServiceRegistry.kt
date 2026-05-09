@@ -4,6 +4,7 @@ import org.springframework.stereotype.Service
 import trafficshield_gateway.config.CircuitBreakerConfig
 import trafficshield_gateway.config.RateLimitConfig
 import trafficshield_gateway.config.TrafficShieldProperties
+import trafficshield_gateway.model.LoadBalancingStrategy
 import trafficshield_gateway.model.ServiceInstance
 
 @Service
@@ -28,5 +29,10 @@ class ServiceRegistry(
     fun getCircuitBreakerConfig(serviceName: String): CircuitBreakerConfig {
         return properties.services[serviceName]?.circuitBreaker
             ?: throw IllegalArgumentException("No circuit breaker config found for service: $serviceName")
+    }
+
+    fun getLoadBalancingStrategy(serviceName: String): LoadBalancingStrategy {
+        return properties.services[serviceName]?.loadBalancingStrategy
+            ?: LoadBalancingStrategy.ROUND_ROBIN
     }
 }

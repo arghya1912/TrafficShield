@@ -69,6 +69,7 @@ class ProxyService(
 
         val circuitBreakerConfig = serviceRegistry.getCircuitBreakerConfig(serviceName)
         val instances = serviceRegistry.getInstances(serviceName)
+        val loadBalancingStrategy = serviceRegistry.getLoadBalancingStrategy(serviceName)
 
         val availableInstances = instances.filter { instance ->
             circuitBreakerService.isRequestAllowed(
@@ -110,7 +111,11 @@ class ProxyService(
             )
         }
 
-        val selectedInstance = loadBalancer.choose(serviceName, availableInstances)
+        val selectedInstance = loadBalancer.choose(
+            serviceName = serviceName,
+            instances = availableInstances,
+            strategy = loadBalancingStrategy
+        )
 
         val normalizedPath = path.trimStart('/')
         val targetUrl = "${selectedInstance.baseUrl}/$normalizedPath"
